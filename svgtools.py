@@ -18,11 +18,16 @@ def get_polygons(svg_filename):
     """
     s = xml.dom.minidom.parse(svg_filename)
     polys = []
+    # the width and height of the svg image (needed for our coordinate transform):
+    sw = float(s.getElementsByTagName('svg')[0].getAttribute('width'))
+    sh = float(s.getElementsByTagName('svg')[0].getAttribute('height'))
     for rect in s.getElementsByTagName('rect'):
         x = float(rect.getAttribute('x'))
         y = float(rect.getAttribute('y'))
         width = float(rect.getAttribute('width'))
         height = float(rect.getAttribute('height'))
+        # coordinate system transform:
+        y = sh - y - height
         coords = [(x, y), (x+width, y), (x+width, y+height), (x, y+height), (x, y)]
         polys.append((rect.getAttribute('id'), Polygon(coords)))
     for path in s.getElementsByTagName('path'):
