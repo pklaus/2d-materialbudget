@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+"""
+SVG tools
+"""
+
 # https://docs.python.org/3/library/xml.dom.minidom.html
 import xml.dom.minidom
 # https://pypi.python.org/pypi/svg.path
@@ -48,7 +52,7 @@ def parse_point(string):
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description='Testing svgtools.')
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('svg_file', help='The svg file to read in')
     parser.add_argument('points', metavar='POINT', nargs='*', type=parse_point, help='Points to check')
     parser.add_argument('--debug', action='store_true', help='Enable debugging output')
