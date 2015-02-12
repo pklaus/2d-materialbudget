@@ -5,7 +5,7 @@ import xml.dom.minidom
 # https://pypi.python.org/pypi/svg.path
 import svg.path
 # http://toblerity.org/shapely/manual.html
-from shapely.geometry import Polygon, Point
+from shapely.geometry import Polygon, Point, box
 
 
 def get_polygons(svg_filename):
@@ -28,8 +28,7 @@ def get_polygons(svg_filename):
         height = float(rect.getAttribute('height'))
         # coordinate system transform:
         y = sh - y - height
-        coords = [(x, y), (x+width, y), (x+width, y+height), (x, y+height), (x, y)]
-        polys.append((rect.getAttribute('id'), Polygon(coords)))
+        polys.append((rect.getAttribute('id'), box(x, y, x+width, y+height)))
     for path in s.getElementsByTagName('path'):
         p = svg.path.parse_path(path.getAttribute('d'))
         if not p.closed: continue
