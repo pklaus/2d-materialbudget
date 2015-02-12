@@ -52,12 +52,17 @@ def main():
     parser = argparse.ArgumentParser(description='Testing svgtools.')
     parser.add_argument('svg_file', help='The svg file to read in')
     parser.add_argument('points', metavar='POINT', nargs='*', type=parse_point, help='Points to check')
+    parser.add_argument('--debug', action='store_true', help='Enable debugging output')
     args = parser.parse_args()
     try:
         polys = get_polygons(args.svg_file)
     except FileNotFoundError:
         parser.error('Please provide an SVG file.')
     print('{} polygons or rectangles found in the SVG file "{}".'.format(len(polys), args.svg_file))
+    if args.debug:
+        if polys: print("All polygons found:")
+        for poly in polys:
+            print(*poly)
     for p in args.points:
         print(p)
         for poly in polys:
