@@ -9,7 +9,9 @@ import xml.dom.minidom
 # https://pypi.python.org/pypi/svg.path
 import svg.path
 # http://toblerity.org/shapely/manual.html
-from shapely.geometry import Polygon, Point, box
+from shapely.geometry import Polygon, Point, LineString, box
+
+import re
 
 
 def get_polygons(svg_filename):
@@ -35,7 +37,14 @@ def get_polygons(svg_filename):
         polys.append((rect.getAttribute('id'), box(x, y, x+width, y+height)))
     for path in s.getElementsByTagName('path'):
         p = svg.path.parse_path(path.getAttribute('d'))
-        if not p.closed: continue
+        if not p.closed:
+            try:
+                m = re.search(r'stroke-width:(\d+(\.\d+)?)', path.getAttribute('style'))
+                trace_width = float(m.group(1))
+                assert trace_width > 0.0
+            except:
+                print("Cannot handle the open path with the id {}".format(path.getAttribute('id')))
+                continue
         coords = [p[0].start]
         for el in p:
             if type(el) != svg.path.Line:
@@ -44,7 +53,12 @@ def get_polygons(svg_filename):
         # converting the 'complex' coordinate type from svg.path.parse_path() to tuple
         # and transform coordinates from SVG to project convention at the same time
         coords = [(c.real, sh - c.imag) for c in coords]
-        polys.append((path.getAttribute('id'), Polygon(coords)))
+        if not p.closed:
+            ls = LineString(coords)
+            polygon = ls.buffer(distance=trace_width/2.0, resolution=16, cap_style=2, join_style=1, mitre_limit=1.0)
+        else:
+            polygon = Polygon(coords)
+        polys.append((path.getAttribute('id'), polygon))
     return polys
 
 
