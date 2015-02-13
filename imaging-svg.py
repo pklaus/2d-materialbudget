@@ -101,7 +101,9 @@ def main():
     np.save(open('resulting-material-budget.npy', 'wb'), totals_layer)
     print("Showing totals layer")
     plt.imshow(totals_layer.T, origin="lower", interpolation="nearest", extent=[start.x, end.x, start.y, end.y])
-    plt.colorbar()
+    #plt.colorbar()
+    # create the colorbar with a better scale to the image:
+    plt.colorbar(fraction=0.015, pad=0.04)
     plt.savefig('resulting-material-budget.eps')
     plt.show()
     import pdb; pdb.set_trace()
