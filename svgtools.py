@@ -41,7 +41,9 @@ def get_polygons(svg_filename):
             if type(el) != svg.path.Line:
                 raise NameError('The SVG file contains a path with crap: {}.'.format(type(el)))
             coords.append(el.end)
-        coords = [(c.real, c.imag) for c in coords]
+        # converting the 'complex' coordinate type from svg.path.parse_path() to tuple
+        # and transform coordinates from SVG to project convention at the same time
+        coords = [(c.real, sh - c.imag) for c in coords]
         polys.append((path.getAttribute('id'), Polygon(coords)))
     return polys
 
