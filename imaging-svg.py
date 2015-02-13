@@ -104,6 +104,7 @@ def main():
     #plt.colorbar()
     # create the colorbar with a better scale to the image:
     plt.colorbar(fraction=0.015, pad=0.04)
+    plt.savefig('resulting-material-budget.png')
     plt.savefig('resulting-material-budget.eps')
     plt.show()
     import pdb; pdb.set_trace()
