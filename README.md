@@ -20,9 +20,13 @@ There are a couple of things to keep in mind though:
 
 * SVG only has a notion of pixels (px).
   One SVG px translates into one mm in this software.
-* In the SVG coordinate system, however, y points downwards.
+* In the *SVG coordinate system*  **y is pointing downwards**.
   So whenever we import from or export to SVG,
   we have to transform the coordinates accordingly.
+  (The *Inkscape user interface*, however, uses the same coordinate system
+  definition as this project.
+  See the [Inkscape guide on its coordinate system][inkscape_coordinates]
+  for more information.)
 
 This software has some limitations concerning SVG files.
 
@@ -37,3 +41,4 @@ This software has some limitations concerning SVG files.
 * Philipp Klaus
   <klaus@physik.uni-frankfurt.de>
 
+[inkscape_coordinates]: http://tavmjong.free.fr/INKSCAPE/MANUAL/html/Coordinates.html
