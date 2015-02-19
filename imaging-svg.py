@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
 """
-Imaging SVG images.
+This tool 'images' SVG images.
 
-This tool 'images' SVG images. By imaging we mean binning
-the vector image and analyzing each bin with Monte Carlo sampling.
+By imaging we mean defining a meshgrid on top of a vector image
+describing the geometry and probing the material budget in each
+grid cell / bin with with Monte Carlo sampling.
 """
 
 # http://toblerity.org/shapely/manual.html
@@ -12,6 +13,7 @@ from shapely.geometry import Polygon, Point, box
 # http://docs.scipy.org/doc/numpy/index.html
 import numpy as np
 from matplotlib import pyplot as plt
+import pprint
 
 from svgtools import get_polygons
 
@@ -28,12 +30,19 @@ def main():
     parser.add_argument('--num-y-bins', type=int, required=True, help='Number of bins in the y direction')
     parser.add_argument('--samples-per-bin', type=float, help='Number of bins in the y direction')
     parser.add_argument('--debug', action='store_true', help='enable debugging output')
+    parser.add_argument('--fast', action='store_true', help='Speed up imaging complicated SVGs with overlapping polygons of the same layer')
     parser.add_argument('svg_file', help='The svg file to read in')
+    parser.add_argument('output_name', nargs='?', help='The name of your output files', default='resulting-material-budget')
     args = parser.parse_args()
     try:
         polys = get_polygons(args.svg_file)
     except FileNotFoundError:
         parser.error('Please provide an SVG file.')
+
+    args_dict = vars(args).copy()
+    args_dict['start'] = str(args_dict['start'])
+    args_dict['end'] = str(args_dict['end'])
+    with open(args.output_name + '.args.pydict', 'w') as f: f.write(pprint.pformat(args_dict))
 
     # Let's make sure that our bounds follow those rules:
     #   --start.x  <  --end.x   and   --start.y  <  --end.y
@@ -64,7 +73,12 @@ def main():
         b['shape'] = box(x, y, x+width_step, y+height_step)
         b['samples'] = np.random.rand(args.samples_per_bin, 2)
         b['layers'] = dict()
+        b['mb_layers'] = {'baselayer': {'total_hits': 0}, 'other_layers': {'total_hits': 0}}
         bins[id] = b
+    # Find the baselayer poly:
+    bl_polys = [poly for poly in polys if poly[0] == 'baselayer']
+    assert len(bl_polys) == 1
+    bl_poly = bl_polys[0]
     # Starting 'imaging'
     print('{} polygons, lines (with a non-0 line-width) or rectangles found in the SVG file "{}".'.format(len(polys), args.svg_file))
     for id in bins:
@@ -73,13 +87,21 @@ def main():
         for sample in b['samples']:
             # calculate sample positions
             sp = Point(sample[0] * width_step + bounds[0], sample[1] * height_step + bounds[1])
+            if bl_poly[1].contains(sp): b['mb_layers']['baselayer']['total_hits'] += 1
+            other_layer_hit = False
             for poly in polys:
                 if poly[1].contains(sp):
+                    if not poly[0] == 'baselayer':
+                        other_layer_hit = True
+                        b['mb_layers']['other_layers']['total_hits'] += 1
+                        if args.fast: break
                     try:
                         b['layers'][poly[0]]['total_hits'] += 1
                     except KeyError:
                         b['layers'][poly[0]] = dict(total_hits=1)
         # calculate percentage of hits for each layer
+        for layer in b['mb_layers']:
+            b['mb_layers'][layer]['norm_hits'] = float(b['mb_layers'][layer]['total_hits']) / args.samples_per_bin
         for layer in b['layers']:
             b['layers'][layer]['norm_hits'] = float(b['layers'][layer]['total_hits']) / args.samples_per_bin
         bins[id] = b
@@ -98,14 +120,25 @@ def main():
             per_layer_maps[layer][b['id_tuple']] = b['layers'][layer]['norm_hits']*100
     for layer in per_layer_maps:
         totals_layer += per_layer_maps[layer]
-    np.save(open('resulting-material-budget.npy', 'wb'), totals_layer)
+    mb_totals_layer = np.zeros((num_x_bins, num_y_bins))
+    for id in bins:
+        b = bins[id]
+        mb_totals_layer[b['id_tuple']] = b['mb_layers']['baselayer']['norm_hits'] * 0.02 + b['mb_layers']['other_layers']['norm_hits'] * 0.04
+    np.save(open(args.output_name + '.npy', 'wb'), totals_layer)
     print("Showing totals layer")
     plt.imshow(totals_layer.T, origin="lower", interpolation="nearest", extent=[start.x, end.x, start.y, end.y])
     #plt.colorbar()
     # create the colorbar with a better scale to the image:
     plt.colorbar(fraction=0.015, pad=0.04)
-    plt.savefig('resulting-material-budget.png')
-    plt.savefig('resulting-material-budget.eps')
+    plt.savefig(args.output_name + '.png')
+    plt.savefig(args.output_name + '.eps')
+    plt.show()
+    # And the material budget:
+    np.save(open(args.output_name + '.mb.npy', 'wb'), mb_totals_layer)
+    plt.imshow(mb_totals_layer.T, origin="lower", interpolation="nearest", extent=[start.x, end.x, start.y, end.y])
+    plt.colorbar(fraction=0.015, pad=0.04)
+    plt.savefig(args.output_name + '.mb.png')
+    plt.savefig(args.output_name + '.mb.eps')
     plt.show()
     import pdb; pdb.set_trace()
     #for layer in per_layer_maps:
