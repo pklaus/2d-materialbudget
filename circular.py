@@ -109,7 +109,15 @@ def main():
     for job in jobs:
         pos = job.patch.shape.centroid
         dist = (pos.x**2+pos.y**2)**(.5)
-        theta = math.atan(dist/150.)*180/math.pi
+        # Station 0
+        #dist_target = 50
+        # Station 1
+        #dist_target = 100
+        # Station 2
+        dist_target = 150
+        # Station 3
+        #dist_target = 200
+        theta = math.atan(dist/dist_target)*180/math.pi
         idx = bin_idx(theta, angles)
         if idx is None: continue
         for material in job.result:
@@ -126,6 +134,9 @@ def main():
     materials = [material for material in values]
     #materials = ['TPG', 'glue', 'polyimide', 'Cu', 'Si']
     materials = ['TPG', 'glue', 'Si', 'polyimide', 'Cu']
+    #materials = ['CVD', 'glue', 'Si', 'polyimide', 'Cu']
+    #materials = ['TPG', 'glue', 'Si', 'polyimide', 'Al']
+    #materials = ['CVD', 'glue', 'Si', 'polyimide', 'Al']
     widths = angles[1:] - angles[:-1]
     angles = angles[:-1]
     for material in materials:
@@ -134,15 +145,34 @@ def main():
         bottom += values[material]
         color_index += 1
         color_index %= 9
-    plt.ylabel(r'Material budget $x/X_0 [\%]$')
-    plt.xlabel(r'Polar angle $\vartheta$ $[^\circ]$')
-    plt.title('3rd MVD station')
+    axis_font = {'size':'20'}
+    #axis_font = {'fontname':'Arial', 'size':'14'}
+    plt.ylabel(r'Material budget $\mathrm{x/X_0}\ [\%]$',     **axis_font)
+    plt.xlabel(r'Polar angle $\mathrm{\vartheta}\ [^\circ]$', **axis_font)
+    #plt.title('3rd MVD station')
+    title_font = {'size': '22'}
+    #plt.title('3rd MVD station with PRESTO', **title_font)
     #plt.text(r'integrated over the azimuthal angle $\varphi$')
     lrefs = [plots[material][0] for material in materials]
     plt.legend(reversed(lrefs), reversed(materials), loc=2)
-    plt.gca().add_line(plt.Line2D((2.5, 25), (0.5, 0.5), lw=2, color='r'))
-    plt.gca().add_line(plt.Line2D((25, 25), (0, 0.5), lw=2, color='r'))
-    plt.gca().add_line(plt.Line2D((2.5, 2.5), (0, 0.5), lw=2, color='r'))
+    # Limit 0.3
+    #material_budget_limit = 0.3
+    # Limit 0.5
+    material_budget_limit = 0.5
+    #col_mb_limit = 'g'
+    col_mb_limit = (.0, .7, .0)
+    #col_accept   = 'y'
+    col_accept   = (.93, .93, .0)
+    plt.gca().add_line(plt.Line2D((2.5, 25), (material_budget_limit, material_budget_limit), lw=2, color=col_mb_limit )) # color='r'))
+    plt.gca().add_line(plt.Line2D((25, 25), (0, material_budget_limit), lw=2, color=col_accept))
+    plt.gca().add_line(plt.Line2D((2.5, 2.5), (0, material_budget_limit), lw=2, color=col_accept))
+
+    x = (0, 2.5,                   2.5,                    25, 25, 30,  30,   0)
+    y = (0, 0,   material_budget_limit, material_budget_limit,  0,  0, 0.6, 0.6)
+    plt.fill(x, y, alpha=0.4, facecolor='w')
+    #patch(Polygon([[0, 0], [4, 1.1], [6, 2.5], [2, 1.4]], closed=True, fill=False, hatch='/'))
+
+
     plt.savefig(args.output_name + '.theta.png')
     plt.savefig(args.output_name + '.theta.eps')
     plt.show()
@@ -191,10 +221,27 @@ def main():
     #               (0.25,  0.0, 0.0),
     #               (1.0,  0.0, 0.0)]}
     )
-    norm = matplotlib.colors.Normalize()
+    #norm = matplotlib.colors.Normalize()
+    #if material_budget_limit == 0.3:
+    #    norm = matplotlib.colors.Normalize(vmin=0, vmax=0.402)
+    #elif material_budget_limit == 0.5:
+    #    norm = matplotlib.colors.Normalize(vmin=0, vmax=0.67)
     norm = matplotlib.colors.Normalize(vmin=0, vmax=0.67)
-    plt.imshow(totals_layer, cmap=cmap, norm=norm, aspect='equal', origin="lower", interpolation="nearest", extent=[-80, 80, -80, 80])
-    plt.gca().add_patch(plt.Circle((0, 0), radius=69.946, fill=None, edgecolor='r'))
+    #plt.imshow(totals_layer, origin="lower", interpolation="nearest", extent=[start.x, end.x, start.y, end.y])
+    #plt.gca().add_patch(plt.Circle((0, 0), radius=g.acceptance_radius, fill=None, edgecolor='r'))
+    # hard coded
+    # Station 0
+    plt.imshow(totals_layer, cmap=cmap, norm=norm, aspect='equal', origin="lower", interpolation="nearest", extent=[-30, 30, -30, 30])
+    plt.gca().add_patch(plt.Circle((0, 0), radius=25, fill=None, edgecolor='r'))
+    # Station 1
+    #plt.imshow(totals_layer, cmap=cmap, norm=norm, aspect='equal', origin="lower", interpolation="nearest", extent=[-55, 55, -55, 55])
+    #plt.gca().add_patch(plt.Circle((0, 0), radius=50, fill=None, edgecolor='r'))
+    # Station 2
+    #plt.imshow(totals_layer, cmap=cmap, norm=norm, aspect='equal', origin="lower", interpolation="nearest", extent=[-80, 80, -80, 80])
+    #plt.gca().add_patch(plt.Circle((0, 0), radius=69.946, fill=None, edgecolor='r'))
+    # Station 3
+    #plt.imshow(totals_layer, cmap=cmap, norm=norm, aspect='equal', origin="lower", interpolation="nearest", extent=[-105, 105, -105, 105])
+    #plt.gca().add_patch(plt.Circle((0, 0), radius=100, fill=None, edgecolor='r'))
     # create the colorbar with a better scale to the image:
     plt.colorbar(fraction=0.015, pad=0.04)
     plt.savefig(args.output_name + '.png')

@@ -283,6 +283,12 @@ def main():
     #    print(job.result)
     #import pdb; pdb.set_trace()
 
+    # save the CalculatePatchJob results:
+    for job in jobs:
+        del job.patch.samples
+    with open(args.output_name + '.pkl', 'wb') as f:
+        pickle.dump(jobs, f, pickle.HIGHEST_PROTOCOL)
+
     # Reporting
     totals_layer = np.zeros((num_x_bins, num_y_bins))
     for job in jobs:
@@ -297,12 +303,6 @@ def main():
     plt.savefig(args.output_name + '.png')
     plt.savefig(args.output_name + '.eps')
     plt.show()
-
-    # save the CalculatePatchJob results:
-    for job in jobs:
-        del job.patch.samples
-    with open(args.output_name + '.pkl', 'wb') as f:
-        pickle.dump(jobs, f, pickle.HIGHEST_PROTOCOL)
 
     import pdb; pdb.set_trace()
 

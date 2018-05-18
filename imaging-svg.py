@@ -9,7 +9,7 @@ grid cell / bin with with Monte Carlo sampling.
 """
 
 # http://toblerity.org/shapely/manual.html
-from shapely.geometry import Polygon, Point, box
+import shapely.geometry
 # http://docs.scipy.org/doc/numpy/index.html
 import numpy as np
 from matplotlib import pyplot as plt
@@ -19,7 +19,31 @@ from svgtools import get_polygons
 
 def parse_point(string):
     coords = string.split(',')
-    return Point(float(coords[0]), float(coords[1]))
+    return shapely.geometry.Point(float(coords[0]), float(coords[1]))
+
+
+
+class Shape(object):
+    """
+    Representing a (2d projection of a) geometrical shape
+    with additional properties reflecting its material budget.
+    """
+    def __init__(self, name, polygon, layer="", material="", thickness=0.01, component=""):
+        self.name = name
+        self.polygon = polygon
+        self.layer = name
+        self.material = material
+        self.component = component
+        self.thickness = thickness
+
+def Contour(object):
+    """
+    Contains all Shapes making up a single layer of material.
+    """
+    def __init__(self, name, shapes, material="", thickness=0.01, component=""):
+        self.shapes = shapes
+        #for shape in shapes:
+        #    assert shape.material = material
 
 def main():
     import argparse
@@ -39,6 +63,7 @@ def main():
     except FileNotFoundError:
         parser.error('Please provide an SVG file.')
 
+    # Save the CLI --args in a file:
     args_dict = vars(args).copy()
     args_dict['start'] = str(args_dict['start'])
     args_dict['end'] = str(args_dict['end'])
@@ -47,8 +72,8 @@ def main():
     # Let's make sure that our bounds follow those rules:
     #   --start.x  <  --end.x   and   --start.y  <  --end.y
     f, t = args.start, args.end
-    start = Point(min(f.x, t.x), min(f.y, t.y))
-    end   = Point(max(f.x, t.x), max(f.y, t.y))
+    start = shapely.geometry.Point(min(f.x, t.x), min(f.y, t.y))
+    end   = shapely.geometry.Point(max(f.x, t.x), max(f.y, t.y))
     del f, t
     print('Imaging area from {} to {}'.format(start, end))
 
@@ -58,38 +83,41 @@ def main():
     height = end.y - start.y
     width_step  = width  / num_x_bins
     height_step = height / num_y_bins
-    # Preparing our bins
-    bins = dict()
+
+    # Preparing our Patches / bins
+    patches = dict()
     for id in range(num_x_bins * num_y_bins):
-        b = dict()
+        shape = shapely.geometry.box(x, y, x+width_step, y+height_step)
+        p = Munch()
+        p.id = id
+        p.shape = shape
         x_num = id % num_x_bins
         y_num = id // num_x_bins
         x = start.x + x_num * width_step
         y = start.y + y_num * height_step
-        b['id'] = id
-        b['x_num'] = x_num
-        b['y_num'] = y_num
-        b['id_tuple'] = (x_num, y_num)
-        b['shape'] = box(x, y, x+width_step, y+height_step)
-        b['samples'] = np.random.rand(args.samples_per_bin, 2)
-        b['layers'] = dict()
-        b['mb_layers'] = {'baselayer': {'total_hits': 0}, 'other_layers': {'total_hits': 0}}
-        bins[id] = b
-    # Find the baselayer poly:
-    bl_polys = [poly for poly in polys if poly[0] == 'baselayer']
-    assert len(bl_polys) == 1
-    bl_poly = bl_polys[0]
+        p.x_num = x_num
+        p.y_num = y_num
+        p.id_tuple = (x_num, y_num)
+        p.samples = np.random.rand(args.samples_per_bin, 2)
+        p.materials = dict()
+        p.components = dict()
+        patches[id] = p
+
     # Starting 'imaging'
     print('{} polygons, lines (with a non-0 line-width) or rectangles found in the SVG file "{}".'.format(len(polys), args.svg_file))
-    for id in bins:
-        b = bins[id]
+    for id in patches:
+        p = patches[id]
+
         bounds = b['shape'].bounds
+        shape = b['shape']
+        potential_polys = [poly for poly in polys if poly[1].intersects(shape)]
+        if len(potential_polys): print("Number of potential polygons: {}".format(len(potential_polys)))
         for sample in b['samples']:
             # calculate sample positions
-            sp = Point(sample[0] * width_step + bounds[0], sample[1] * height_step + bounds[1])
+            sp = shapely.geometry.Point(sample[0] * width_step + bounds[0], sample[1] * height_step + bounds[1])
             if bl_poly[1].contains(sp): b['mb_layers']['baselayer']['total_hits'] += 1
             other_layer_hit = False
-            for poly in polys:
+            for poly in potential_polys:
                 if poly[1].contains(sp):
                     if not poly[0] == 'baselayer':
                         other_layer_hit = True
@@ -105,6 +133,7 @@ def main():
         for layer in b['layers']:
             b['layers'][layer]['norm_hits'] = float(b['layers'][layer]['total_hits']) / args.samples_per_bin
         bins[id] = b
+
     # Reporting
     per_layer_maps = dict()
     totals_layer = np.zeros((num_x_bins, num_y_bins))

@@ -10,6 +10,8 @@ import xml.dom.minidom
 import svg.path
 # http://toblerity.org/shapely/manual.html
 from shapely.geometry import Polygon, Point, LineString, box
+# http://svgwrite.readthedocs.org/en/latest/
+import svgwrite
 
 import re
 
@@ -61,13 +63,25 @@ def get_polygons(svg_filename):
         polys.append((path.getAttribute('id'), polygon))
     return polys
 
-def polygons_to_svg(list_of_polygons, size, origin):
-    import svgwrite
+def polygons_to_svg(list_of_polygons, size, origin, profile='full'):
     viewbox = [-origin[0], -origin[1], size[0], size[1]]
     viewbox = ' '.join(str(el) for el in viewbox)
-    dwg = svgwrite.Drawing(size=size, viewBox=viewbox)
+    dwg = svgwrite.Drawing(size=size, viewBox=viewbox, profile=profile)
     for polygon in list_of_polygons:
-        dwg.add(svgwrite.shapes.Polygon(polygon, fill='red'))
+        dwg.add(svgwrite.shapes.Polygon(polygon, fill='red', opacity=0.5))
+    return dwg
+
+def geometry_to_svg(geometry, top_level_entity, size, origin, profile='full'):
+    g = geometry
+    viewbox = [-origin[0], -origin[1], size[0], size[1]]
+    viewbox = ' '.join(str(el) for el in viewbox)
+    dwg = svgwrite.Drawing(size=size, viewBox=viewbox, profile=profile)
+    for base_component in g.components[top_level_entity].base_components:
+        color = g.colorcode[base_component.material].color
+        opacity = g.colorcode[base_component.material].opacity
+        for polygon in base_component.polygons:
+            polygon = polygon.exterior.coords
+            dwg.add(svgwrite.shapes.Polygon(polygon, fill=color, opacity=opacity))
     return dwg
 
 def parse_point(string):
