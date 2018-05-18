@@ -267,7 +267,7 @@ def main():
 
     # Starting 'imaging'
     p = multiprocessing.Pool(multiprocessing.cpu_count())
-    chunksize = 20
+    chunksize = 3 * multiprocessing.cpu_count()
     jobs = [CalculatePatchJob(patches[id], g) for id in patches]
     #jobs = p.map(calc_job, jobs, chunksize=chunksize)
     ## instead use imap_unordered (to give more status output):
