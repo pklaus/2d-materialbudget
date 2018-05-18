@@ -61,6 +61,14 @@ def get_polygons(svg_filename):
         polys.append((path.getAttribute('id'), polygon))
     return polys
 
+def polygons_to_svg(list_of_polygons, size, origin):
+    import svgwrite
+    viewbox = [-origin[0], -origin[1], size[0], size[1]]
+    viewbox = ' '.join(str(el) for el in viewbox)
+    dwg = svgwrite.Drawing(size=size, viewBox=viewbox)
+    for polygon in list_of_polygons:
+        dwg.add(svgwrite.shapes.Polygon(polygon, fill='red'))
+    return dwg
 
 def parse_point(string):
     coords = string.split(',')
