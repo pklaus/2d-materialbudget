@@ -54,6 +54,10 @@ This software has some limitations concerning SVG files.
 * [numpy](http://docs.scipy.org/doc/numpy/index.html)
 * [matplotlib](http://matplotlib.org/)
 
+The dependencies can be installed using:
+
+    pip install --upgrade -r requirements.txt
+
 #### Author
 
 * Philipp Klaus
