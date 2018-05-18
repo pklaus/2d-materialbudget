@@ -2,3 +2,6 @@ numpy
 matplotlib
 shapely
 svg.path
+svgwrite
+graphviz
+munch

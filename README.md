@@ -53,6 +53,9 @@ This software has some limitations concerning SVG files.
 * [svg.path](https://pypi.python.org/pypi/svg.path/)
 * [numpy](http://docs.scipy.org/doc/numpy/index.html)
 * [matplotlib](http://matplotlib.org/)
+* [svgwrite](https://github.com/mozman/svgwrite)
+* [graphviz](https://github.com/xflr6/graphviz)
+* [munch](https://github.com/Infinidat/munch)
 
 The dependencies can be installed using:
 
