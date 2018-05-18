@@ -162,7 +162,7 @@ def main():
     parser.add_argument('--end',   metavar='POINT', required=True, type=parse_point, help='End Point')
     parser.add_argument('--num-x-bins', type=int, required=True, help='Number of bins in the x direction')
     parser.add_argument('--num-y-bins', type=int, required=True, help='Number of bins in the y direction')
-    parser.add_argument('--samples-per-bin', type=float, help='Number of bins in the y direction')
+    parser.add_argument('--samples-per-bin', type=int, help='Number of bins in the y direction')
     parser.add_argument('--fast', action='store_true', help='Speed up imaging complicated SVGs with overlapping polygons of the same layer')
     parser.add_argument('json_geometry_file', help='The geometry file in JSON format')
     parser.add_argument('output_name', help='The basename for the output files')
