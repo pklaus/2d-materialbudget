@@ -10,6 +10,8 @@ import shapely.affinity
 import shapely.speedups
 # http://docs.scipy.org/doc/numpy/index.html
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 # https://github.com/Infinidat/munch
 from munch import munchify, Munch
