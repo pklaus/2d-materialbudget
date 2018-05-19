@@ -24,12 +24,15 @@ import json
 import multiprocessing
 import pickle
 import shutil
+import time
 from datetime import datetime as dt
 
 DEBUG = False
 
 if shapely.speedups.available:
     shapely.speedups.enable()
+
+clock = time.perf_counter
 
 class BaseComponent(object):
     """
@@ -126,6 +129,9 @@ class CalculatePatchJob(object):
         self.geometry = geometry
 
     def calc(self):
+        start = clock()
+        pid = multiprocessing.current_process().pid
+        print("{id} (patch id) {pid} (process id) starting calculating patch".format(pid=pid, **self.patch))
         #print("calculating for position {}".format(self.patch.shape.centroid))
         r = dict() # result dict
         p = self.patch
@@ -149,6 +155,7 @@ class CalculatePatchJob(object):
         self.result = Munch(r)
         del bcs
         del self.geometry
+        print("{id} (patch id) {pid} (process id) finished calculating patch after {time:.3f}s".format(time=clock()-start, pid=pid, **self.patch))
         return self
 
 def parse_point(string):
