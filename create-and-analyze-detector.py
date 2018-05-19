@@ -172,31 +172,36 @@ def main():
 
     DEBUG = args.debug
 
-    # Save the CLI --args in a file:
-    args_dict = vars(args).copy()
+    args_dict = vars(args)
+    run(**args_dict)
+
+
+def run(**kwargs):
+    # Save the kwargs in a file:
+    args_dict = kwargs.copy()
     args_dict['start'] = str(args_dict['start'])
     args_dict['end'] = str(args_dict['end'])
-    with open(args.output_name + '.args.pydict', 'w') as f:
+    with open(kwargs.get('output_name') + '.args.pydict', 'w') as f:
         f.write(pprint.pformat(args_dict))
-    shutil.copyfile(args.json_geometry_file, args.output_name + '.geometry.json')
+    shutil.copyfile(kwargs.get('json_geometry_file'), kwargs.get('output_name') + '.geometry.json')
 
     # Let's make sure that our bounds follow those rules:
     #   --start.x  <  --end.x   and   --start.y  <  --end.y
-    f, t = args.start, args.end
+    f, t = kwargs.get('start'), kwargs.get('end')
     start = shapely.geometry.Point(min(f.x, t.x), min(f.y, t.y))
     end   = shapely.geometry.Point(max(f.x, t.x), max(f.y, t.y))
     del f, t
     print('Imaging area from {} to {}'.format(start, end))
 
-    num_x_bins = args.num_x_bins
-    num_y_bins = args.num_y_bins
+    num_x_bins = kwargs.get('num_x_bins')
+    num_y_bins = kwargs.get('num_y_bins')
     width  = end.x - start.x
     height = end.y - start.y
     width_step  = width  / num_x_bins
     height_step = height / num_y_bins
 
     # Starting to read in the geometry definition
-    with open(args.json_geometry_file, 'r') as geometry_file:
+    with open(kwargs.get('json_geometry_file'), 'r') as geometry_file:
         g = json.load(geometry_file)
     # g stands for 'geometry'
     g = munchify(g)
@@ -238,7 +243,7 @@ def main():
     if DEBUG: print("Creating SVG")
     dwg = geometry_to_svg(g, g.top_level_entity, g.size, [int(s/2) for s in g.size], profile='tiny')
     if DEBUG: print("Saving to SVG")
-    dwg.saveas(args.output_name + '.svg')
+    dwg.saveas(kwargs.get('output_name') + '.svg')
     if DEBUG: print("Finished saving the SVG file!")
 
 
@@ -260,7 +265,7 @@ def main():
         p.x_num = x_num
         p.y_num = y_num
         p.id_tuple = (x_num, y_num)
-        p.samples = np.random.rand(args.samples_per_bin, 2)
+        p.samples = np.random.rand(kwargs.get('samples_per_bin'), 2)
         p.materials = dict()
         p.components = dict()
         patches[id] = p
@@ -292,7 +297,7 @@ def main():
     # save the CalculatePatchJob results:
     for job in jobs:
         del job.patch.samples
-    with open(args.output_name + '.pkl', 'wb') as f:
+    with open(kwargs.get('output_name') + '.pkl', 'wb') as f:
         pickle.dump(jobs, f, pickle.HIGHEST_PROTOCOL)
 
     # Reporting
@@ -301,13 +306,13 @@ def main():
         p = job.patch
         for material in job.result:
             totals_layer[p.id_tuple] += job.result[material]
-    np.save(open(args.output_name + '.npy', 'wb'), totals_layer)
+    np.save(open(kwargs.get('output_name') + '.npy', 'wb'), totals_layer)
     plt.imshow(totals_layer, origin="lower", interpolation="nearest", extent=[start.x, end.x, start.y, end.y])
     plt.gca().add_patch(plt.Circle((0, 0), radius=g.acceptance_radius, fill=None, edgecolor='r'))
     # create the colorbar with a better scale to the image:
     plt.colorbar(fraction=0.015, pad=0.04)
-    plt.savefig(args.output_name + '.png')
-    plt.savefig(args.output_name + '.eps')
+    plt.savefig(kwargs.get('output_name') + '.png')
+    plt.savefig(kwargs.get('output_name') + '.eps')
     plt.show()
 
     import pdb; pdb.set_trace()
