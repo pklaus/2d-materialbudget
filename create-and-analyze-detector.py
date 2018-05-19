@@ -26,6 +26,7 @@ import pickle
 import shutil
 import time
 from datetime import datetime as dt
+from itertools import combinations
 
 DEBUG = False
 
@@ -52,11 +53,31 @@ class BaseComponent(object):
             if poly.contains(other): return True
         return False
 
+    def overlap(self, other):
+        area = 0.0
+        intersecting_polygons = []
+        pid = multiprocessing.current_process().pid
+        start = clock()
+        print("#{pid} {time:.3f} starting to calc intersections on {num_relevant} relevant polygons".format(pid=pid, time=(clock()-start), num_relevant=len(self.relevant_polygons)))
+        for poly in self.relevant_polygons:
+            intersection = other.intersection(poly)
+            if not intersection.is_empty:
+                intersecting_polygons.append(poly)
+                area += intersection.area
+        print("#{pid} {time:.3f} intersections calculated. Correcting {num_intersecting} intersecting polygons now.".format(pid=pid, time=(clock()-start), num_intersecting=len(intersecting_polygons)))
+        for combo in combinations(intersecting_polygons, 2):
+            intersection = combo[0].intersection(combo[1])
+            if not intersection.is_empty:
+                area -= intersection.area
+        print("#{pid} {time:.3f} intersections corrected".format(pid=pid, time=(clock()-start)))
+        return area
+
     def set_relevant_polygons(self, shape):
         len_total = len(self.polygons)
         self.relevant_polygons = [p for p in self.polygons if p.intersects(shape)]
         len_relevant = len(self.relevant_polygons)
-        #print("{} component: selected {} out of {} polygons as relevant".format(self.name, len_relevant, len_total))
+        print("{} component: selected {} out of {} polygons as relevant".format(self.name, len_relevant, len_total))
+        return len_relevant > 0
 
 def apply_transforms(base_components, transforms):
     for transform in transforms:
@@ -124,9 +145,10 @@ def calc_job(job):
     return job.calc()
 
 class CalculatePatchJob(object):
-    def __init__(self, patch, geometry):
+    def __init__(self, patch, geometry, strategy='sample'):
         self.patch = patch
         self.geometry = geometry
+        self.strategy = 'sample'
 
     def calc(self):
         start = clock()
@@ -138,20 +160,39 @@ class CalculatePatchJob(object):
         shape = p.shape
         bounds = shape.bounds
         bcs = self.geometry.components[self.geometry.top_level_entity].base_components
+        relevant_bcs = []
         for bc in bcs:
-            bc.set_relevant_polygons(shape)
-        for sample in p.samples:
-            # calculate sample positions
-            sp = shapely.geometry.Point(sample[0] * p.width_step + bounds[0], sample[1] * p.height_step + bounds[1])
+            relevant = bc.set_relevant_polygons(shape)
+            if relevant:
+                relevant_bcs.append(bc)
+        bcs = relevant_bcs
+        print("#{pid} {time:.3f} relevant polygons set, {num_bcs} relevant basic shapes".format(time=(clock()-start), pid=pid, num_bcs=len(bcs)))
+        if self.strategy == 'sample':
+            for sample in p.samples:
+                # calculate sample positions
+                sp = shapely.geometry.Point(sample[0] * p.width_step + bounds[0], sample[1] * p.height_step + bounds[1])
+                for bc in bcs:
+                    if bc.contains(sp):
+                        try:
+                            r[bc.material] += bc.material_budget
+                        except KeyError:
+                            r[bc.material] = bc.material_budget
+            # normalize material budget to number of samples
+            for material in r:
+                r[material] = float(r[material]) / len(p.samples)
+        elif self.strategy == 'calculate':
+            shape_area = shape.area
             for bc in bcs:
-                if bc.contains(sp):
+                overlap = bc.overlap(shape)
+                if overlap > 0.0:
                     try:
-                        r[bc.material] += bc.material_budget
+                        r[bc.material] += bc.material_budget * (overlap / shape_area)
                     except KeyError:
-                        r[bc.material] = bc.material_budget
-        # normalize material budget to number of samples
-        for material in r:
-            r[material] = float(r[material]) / len(p.samples)
+                        r[bc.material] = bc.material_budget * (overlap / shape_area)
+        else:
+            raise NotImplementedError('strategy: ' + str(self.strategy))
+        print("#{pid} {time:.3f} overlap calculated".format(time=(clock()-start), pid=pid))
+
         self.result = Munch(r)
         del bcs
         del self.geometry
@@ -173,6 +214,7 @@ def main():
     parser.add_argument('--num-x-bins', type=int, required=True, help='Number of bins in the x direction')
     parser.add_argument('--num-y-bins', type=int, required=True, help='Number of bins in the y direction')
     parser.add_argument('--samples-per-bin', type=int, help='Number of bins in the y direction')
+    parser.add_argument('--strategy', choices=('sample', 'calculate'), help='Stategy to determine the materialbudget.')
     parser.add_argument('json_geometry_file', help='The geometry file in JSON format')
     parser.add_argument('output_name', help='The basename for the output files')
     args = parser.parse_args()
@@ -281,7 +323,7 @@ def run(**kwargs):
     if DEBUG: print("Setting up the multiprocessing process pool")
     p = multiprocessing.Pool(multiprocessing.cpu_count())
     chunksize = 3 * multiprocessing.cpu_count()
-    jobs = [CalculatePatchJob(patches[id], g) for id in patches]
+    jobs = [CalculatePatchJob(patches[id], g, strategy=kwargs.get('strategy')) for id in patches]
     #jobs = p.map(calc_job, jobs, chunksize=chunksize)
     ## instead use imap_unordered (to give more status output):
     results = []
