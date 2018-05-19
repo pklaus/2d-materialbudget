@@ -198,6 +198,7 @@ def main():
     # Starting to read in the geometry definition
     with open(args.json_geometry_file, 'r') as geometry_file:
         g = json.load(geometry_file)
+    # g stands for 'geometry'
     g = munchify(g)
 
     cs = g.components
@@ -241,9 +242,9 @@ def main():
     if DEBUG: print("Finished saving the SVG file!")
 
 
-    if DEBUG: print("calculating material budget now")
 
     # Preparing our Patches (= bins)
+    if DEBUG: print("Preparing the patches (bins)")
     patches = dict()
     for id in range(num_x_bins * num_y_bins):
         p = Munch()
@@ -265,6 +266,7 @@ def main():
         patches[id] = p
 
     # Starting 'imaging'
+    if DEBUG: print("Setting up the multiprocessing process pool")
     p = multiprocessing.Pool(multiprocessing.cpu_count())
     chunksize = 3 * multiprocessing.cpu_count()
     jobs = [CalculatePatchJob(patches[id], g) for id in patches]
@@ -272,6 +274,7 @@ def main():
     ## instead use imap_unordered (to give more status output):
     results = []
     start_time = dt.now()
+    if DEBUG: print("Starting the job processing (material budget sampling in each bin)")
     for i, result in enumerate(p.imap_unordered(calc_job, jobs, chunksize)):
         now = dt.now()
         total_time = (now-start_time)/(i+1) * len(jobs)
@@ -285,6 +288,7 @@ def main():
     #    print(job.result)
     #import pdb; pdb.set_trace()
 
+    if DEBUG: print("Saving the results")
     # save the CalculatePatchJob results:
     for job in jobs:
         del job.patch.samples
