@@ -278,7 +278,7 @@ def main():
         total_time = (now-start_time)/(i+1) * len(jobs)
         eta = start_time + total_time # estimated time of arrival
         eta = eta.replace(microsecond=0)
-        print("Done with CalculatePatchJob #{} of {} ({:.1%}). ETA: {}".format(i, len(jobs), i/len(jobs), eta))
+        print("Done with CalculatePatchJob #{} of {} ({:.1%}). ETA: {} ETT: {}".format(i, len(jobs), i/len(jobs), eta, total_time))
         results.append(result)
     jobs = results
     p.close()
