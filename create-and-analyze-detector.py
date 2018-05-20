@@ -148,7 +148,7 @@ class CalculatePatchJob(object):
     def __init__(self, patch, geometry, strategy='sample'):
         self.patch = patch
         self.geometry = geometry
-        self.strategy = 'sample'
+        self.strategy = strategy
 
     def calc(self):
         start = clock()
