@@ -27,13 +27,13 @@ import shutil
 import time
 from datetime import datetime as dt
 from itertools import combinations
-
-DEBUG = False
+import logging
 
 if shapely.speedups.available:
     shapely.speedups.enable()
 
 clock = time.perf_counter
+logger = logging.getLogger('create-and-analyze-detector')
 
 class BaseComponent(object):
     """
@@ -58,30 +58,30 @@ class BaseComponent(object):
         intersecting_polygons = []
         pid = multiprocessing.current_process().pid
         start = clock()
-        print("#{pid} {time:.3f} starting to calc intersections on {num_relevant} relevant polygons".format(pid=pid, time=(clock()-start), num_relevant=len(self.relevant_polygons)))
+        logger.debug("#{pid} {time:.3f} starting to calc intersections on {num_relevant} relevant polygons".format(pid=pid, time=(clock()-start), num_relevant=len(self.relevant_polygons)))
         for poly in self.relevant_polygons:
             intersection = other.intersection(poly)
             if not intersection.is_empty:
                 intersecting_polygons.append(poly)
                 area += intersection.area
-        print("#{pid} {time:.3f} intersections calculated. Correcting {num_intersecting} intersecting polygons now.".format(pid=pid, time=(clock()-start), num_intersecting=len(intersecting_polygons)))
+        logger.debug("#{pid} {time:.3f} intersections calculated. Correcting {num_intersecting} intersecting polygons now.".format(pid=pid, time=(clock()-start), num_intersecting=len(intersecting_polygons)))
         for combo in combinations(intersecting_polygons, 2):
             intersection = combo[0].intersection(combo[1])
             if not intersection.is_empty:
                 area -= intersection.area
-        print("#{pid} {time:.3f} intersections corrected".format(pid=pid, time=(clock()-start)))
+        logger.debug("#{pid} {time:.3f} intersections corrected".format(pid=pid, time=(clock()-start)))
         return area
 
     def set_relevant_polygons(self, shape):
         len_total = len(self.polygons)
         self.relevant_polygons = [p for p in self.polygons if p.intersects(shape)]
         len_relevant = len(self.relevant_polygons)
-        print("{} component: selected {} out of {} polygons as relevant".format(self.name, len_relevant, len_total))
+        logger.debug("{} component: selected {} out of {} polygons as relevant".format(self.name, len_relevant, len_total))
         return len_relevant > 0
 
 def apply_transforms(base_components, transforms):
     for transform in transforms:
-        if DEBUG: print('Performing a transform of kind "{kind}"'.format(**transform))
+        logger.debug('Performing a transform of kind "{kind}"'.format(**transform))
         t = dict(xfact=1.0, yfact=1.0, xoff=0.0, yoff=0.0, origin='center')
         t.update(dict(transform))
         t = Munch(t)
@@ -101,7 +101,7 @@ def apply_transforms(base_components, transforms):
 
 def apply_transforms_polygons(polygons, transforms):
     for transform in transforms:
-        if DEBUG: print('Performing a transform of kind "{kind}"'.format(**transform))
+        logger.debug('Performing a transform of kind "{kind}"'.format(**transform))
         t = dict(xfact=1.0, yfact=1.0, xoff=0.0, yoff=0.0, origin='center')
         t.update(dict(transform))
         t = Munch(t)
@@ -153,8 +153,8 @@ class CalculatePatchJob(object):
     def calc(self):
         start = clock()
         pid = multiprocessing.current_process().pid
-        print("{id} (patch id) {pid} (process id) starting calculating patch".format(pid=pid, **self.patch))
-        #print("calculating for position {}".format(self.patch.shape.centroid))
+        logger.debug("{id} (patch id) {pid} (process id) starting calculating patch".format(pid=pid, **self.patch))
+        logger.debug("calculating for position {}".format(self.patch.shape.centroid))
         r = dict() # result dict
         p = self.patch
         shape = p.shape
@@ -166,7 +166,7 @@ class CalculatePatchJob(object):
             if relevant:
                 relevant_bcs.append(bc)
         bcs = relevant_bcs
-        print("#{pid} {time:.3f} relevant polygons set, {num_bcs} relevant basic shapes".format(time=(clock()-start), pid=pid, num_bcs=len(bcs)))
+        logger.debug("#{pid} {time:.3f} relevant polygons set, {num_bcs} relevant basic shapes".format(time=(clock()-start), pid=pid, num_bcs=len(bcs)))
         if self.strategy == 'sample':
             for sample in p.samples:
                 # calculate sample positions
@@ -191,12 +191,12 @@ class CalculatePatchJob(object):
                         r[bc.material] = bc.material_budget * (overlap / shape_area)
         else:
             raise NotImplementedError('strategy: ' + str(self.strategy))
-        print("#{pid} {time:.3f} overlap calculated".format(time=(clock()-start), pid=pid))
+        logger.debug("#{pid} {time:.3f} overlap calculated".format(time=(clock()-start), pid=pid))
 
         self.result = Munch(r)
         del bcs
         del self.geometry
-        print("{id} (patch id) {pid} (process id) finished calculating patch after {time:.3f}s".format(time=clock()-start, pid=pid, **self.patch))
+        logger.debug("{id} (patch id) {pid} (process id) finished calculating patch after {time:.3f}s".format(time=clock()-start, pid=pid, **self.patch))
         return self
 
 def parse_point(string):
@@ -204,8 +204,6 @@ def parse_point(string):
     return shapely.geometry.Point(float(coords[0]), float(coords[1]))
 
 def main():
-    global DEBUG
-
     import argparse
     parser = argparse.ArgumentParser(description="Create a detector SVG image from a geometry file stating its components")
     parser.add_argument('--debug', action='store_true', help='enable debugging output')
@@ -219,7 +217,22 @@ def main():
     parser.add_argument('output_name', help='The basename for the output files')
     args = parser.parse_args()
 
-    DEBUG = args.debug
+    # setting up logging and considering --debug
+    ch = logging.StreamHandler()
+    fh = logging.FileHandler(args.output_name + '.log')
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    fh.setFormatter(formatter)
+    ch.setFormatter(formatter)
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
+        fh.setLevel(logging.DEBUG)
+        ch.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
+        fh.setLevel(logging.INFO)
+        ch.setLevel(logging.INFO)
+    logger.addHandler(fh)
+    logger.addHandler(ch)
 
     args_dict = vars(args)
     run(**args_dict)
@@ -240,7 +253,7 @@ def run(**kwargs):
     start = shapely.geometry.Point(min(f.x, t.x), min(f.y, t.y))
     end   = shapely.geometry.Point(max(f.x, t.x), max(f.y, t.y))
     del f, t
-    print('Imaging area from {} to {}'.format(start, end))
+    logger.info('Imaging area from {} to {}'.format(start, end))
 
     num_x_bins = kwargs.get('num_x_bins')
     num_y_bins = kwargs.get('num_y_bins')
@@ -260,7 +273,7 @@ def run(**kwargs):
     # Set .base_components for the components of kind == polygon
     poly_components = [c for c in cs if cs[c].kind == 'polygon']
     for poly_component in poly_components:
-        if DEBUG: print("Reading polygon {}".format(poly_component))
+        logger.info("Reading polygon {}".format(poly_component))
         polygons = [shapely.geometry.Polygon(cs[poly_component].points)]
         material = cs[poly_component].material
         thickness = cs[poly_component].thickness
@@ -285,20 +298,21 @@ def run(**kwargs):
         except FileNotFoundError:
             sys.stderr.write('Could not read SVG image: ' + svg_file)
 
-    if DEBUG: print("Calculating component tree")
+    logger.info("Calculating component tree")
     calc_base_components(g, g.top_level_entity)
-    if DEBUG: print("Converting to SVG coordinate space")
+    logger.info("Converting to SVG coordinate space")
     apply_transforms(g.components[g.top_level_entity].base_components, [dict(kind='scale', yfact=-1, origin=(0, 0))])
-    if DEBUG: print("Creating SVG")
+    logger.info("Creating SVG")
     dwg = geometry_to_svg(g, g.top_level_entity, g.size, [int(s/2) for s in g.size], profile='tiny')
-    if DEBUG: print("Saving to SVG")
+    logger.info("Saving to SVG")
     dwg.saveas(kwargs.get('output_name') + '.svg')
-    if DEBUG: print("Finished saving the SVG file!")
+    logger.info("Finished saving the SVG file!")
+
 
 
 
     # Preparing our Patches (= bins)
-    if DEBUG: print("Preparing the patches (bins)")
+    logger.info("Preparing the patches (bins)")
     patches = dict()
     for id in range(num_x_bins * num_y_bins):
         p = Munch()
@@ -320,7 +334,7 @@ def run(**kwargs):
         patches[id] = p
 
     # Starting 'imaging'
-    if DEBUG: print("Setting up the multiprocessing process pool")
+    logger.info("Setting up the multiprocessing process pool")
     p = multiprocessing.Pool(multiprocessing.cpu_count())
     chunksize = 3 * multiprocessing.cpu_count()
     jobs = [CalculatePatchJob(patches[id], g, strategy=kwargs.get('strategy')) for id in patches]
@@ -328,13 +342,13 @@ def run(**kwargs):
     ## instead use imap_unordered (to give more status output):
     results = []
     start_time = dt.now()
-    if DEBUG: print("Starting the job processing (material budget sampling in each bin)")
+    logger.info("Starting the job processing (material budget sampling in each bin)")
     for i, result in enumerate(p.imap_unordered(calc_job, jobs, chunksize)):
         now = dt.now()
         total_time = (now-start_time)/(i+1) * len(jobs)
         eta = start_time + total_time # estimated time of arrival
         eta = eta.replace(microsecond=0)
-        print("Done with CalculatePatchJob #{} of {} ({:.1%}). ETA: {} ETT: {}".format(i, len(jobs), i/len(jobs), eta, total_time))
+        logger.info("Done with CalculatePatchJob #{} of {} ({:.1%}). ETA: {} ETT: {}".format(i, len(jobs), i/len(jobs), eta, total_time))
         results.append(result)
     jobs = results
     p.close()
@@ -342,7 +356,7 @@ def run(**kwargs):
     #    print(job.result)
     #import pdb; pdb.set_trace()
 
-    if DEBUG: print("Saving the results")
+    logger.info("Saving the results")
     # save the CalculatePatchJob results:
     for job in jobs:
         del job.patch.samples
