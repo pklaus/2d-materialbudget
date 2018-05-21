@@ -86,7 +86,6 @@ def apply_transforms(base_components, transforms):
         t.update(dict(transform))
         t = Munch(t)
         for base_component in base_components:
-            #import pdb; pdb.set_trace()
             polygons = base_component.polygons
             if t.kind == 'scale':
                 t.origin = tuple(t.origin)
@@ -123,7 +122,6 @@ def calc_base_components(g, entity):
             b = calc_base_components(g, comp.name)
             b = [copy.copy(bc) for bc in b]
             apply_transforms(b, comp.transforms)
-            #import pdb; pdb.set_trace()
             base_components += b
         g.components[entity].base_components = base_components
         return g.components[entity].base_components
@@ -352,9 +350,6 @@ def run(**kwargs):
         results.append(result)
     jobs = results
     p.close()
-    #for job in jobs:
-    #    print(job.result)
-    #import pdb; pdb.set_trace()
 
     logger.info("Saving the results")
     # save the CalculatePatchJob results:
@@ -378,7 +373,6 @@ def run(**kwargs):
     plt.savefig(kwargs.get('output_name') + '.eps')
     plt.show()
 
-    import pdb; pdb.set_trace()
 
 if __name__ == "__main__":
     main()
