@@ -8,6 +8,7 @@ from svgtools import get_polygons, polygons_to_svg, geometry_to_svg
 import shapely.geometry
 import shapely.affinity
 import shapely.speedups
+import shapely.prepared
 # http://docs.scipy.org/doc/numpy/index.html
 import numpy as np
 import matplotlib
@@ -47,6 +48,9 @@ class BaseComponent(object):
         self.material = material
         self.thickness = thickness
         self.material_budget = material_budget
+
+    def prepare_polygons(self):
+        self.polygons = [shapely.prepared.prep(polygon) for polygon in self.polygons]
 
     def contains(self, other):
         for poly in self.relevant_polygons:
@@ -158,6 +162,8 @@ class CalculatePatchJob(object):
         shape = p.shape
         bounds = shape.bounds
         bcs = self.geometry.components[self.geometry.top_level_entity].base_components
+        logger.debug("Preparing polygons for faster running times")
+        for bc in bcs: bc.prepare_polygons()
         relevant_bcs = []
         for bc in bcs:
             relevant = bc.set_relevant_polygons(shape)
