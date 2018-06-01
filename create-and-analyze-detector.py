@@ -233,7 +233,10 @@ def main():
     logger.addHandler(ch)
 
     args_dict = vars(args)
+    start = clock()
     run(**args_dict)
+    duration = clock() - start
+    logger.info("Total run time: %.3fs", duration)
 
 
 def run(**kwargs):
