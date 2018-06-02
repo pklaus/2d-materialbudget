@@ -201,14 +201,23 @@ def parse_point(string):
     coords = string.split(',')
     return shapely.geometry.Point(float(coords[0]), float(coords[1]))
 
+def is_power_of_two(num): return ((num & (num - 1)) == 0) and num > 0
+
 def main():
     import argparse
+
+    def argparse_power_of_two(value):
+        num = int(value)
+        if not is_power_of_two(num):
+            raise argparse.ArgumentTypeError(f"'{value}' is not a power of two.")
+        return num
+
     parser = argparse.ArgumentParser(description="Create a detector SVG image from a geometry file stating its components")
     parser.add_argument('--debug', action='store_true', help='enable debugging output')
     parser.add_argument('--start', metavar='POINT', required=True, type=parse_point, help='Start Point')
     parser.add_argument('--end',   metavar='POINT', required=True, type=parse_point, help='End Point')
-    parser.add_argument('--num-x-bins', type=int, required=True, help='Number of bins in the x direction')
-    parser.add_argument('--num-y-bins', type=int, required=True, help='Number of bins in the y direction')
+    parser.add_argument('--num-x-bins', type=argparse_power_of_two, required=True, help='Number of bins in the x direction (should be a power of 2)')
+    parser.add_argument('--num-y-bins', type=argparse_power_of_two, required=True, help='Number of bins in the y direction (should be a power of 2)')
     parser.add_argument('--samples-per-bin', type=int, help='Number of bins in the y direction')
     parser.add_argument('--strategy', choices=('sample', 'calculate'), help='Stategy to determine the materialbudget.')
     parser.add_argument('json_geometry_file', help='The geometry file in JSON format')
@@ -258,6 +267,8 @@ def run(**kwargs):
 
     num_x_bins = kwargs.get('num_x_bins')
     num_y_bins = kwargs.get('num_y_bins')
+    assert is_power_of_two(num_x_bins)
+    assert is_power_of_two(num_y_bins)
     width  = end.x - start.x
     height = end.y - start.y
     width_step  = width  / num_x_bins
