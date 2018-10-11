@@ -1,7 +1,7 @@
 numpy
 matplotlib
 shapely
-svg.path
+svg.path==2.2
 svgwrite
 graphviz
 munch

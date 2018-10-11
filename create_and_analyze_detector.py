@@ -49,6 +49,7 @@ class BaseComponent(object):
         self.material_budget = material_budget
 
     def contains(self, other):
+        #if self.relevant_polygons: logger.info('there are %d relevant polygons!', len(self.relevant_polygons))
         for poly in self.relevant_polygons:
             if poly.contains(other): return True
         return False
@@ -143,9 +144,10 @@ def calc_job(job):
     return job.calc()
 
 class CalculatePatchJob(object):
-    def __init__(self, patch, geometry, strategy='sample'):
+    def __init__(self, patch, geometry, relevant_base_components, strategy='sample'):
         self.patch = patch
         self.geometry = geometry
+        self.relevant_base_components = relevant_base_components
         self.strategy = strategy
 
     def calc(self):
@@ -157,19 +159,16 @@ class CalculatePatchJob(object):
         p = self.patch
         shape = p.shape
         bounds = shape.bounds
-        bcs = self.geometry.components[self.geometry.top_level_entity].base_components
-        relevant_bcs = []
-        for bc in bcs:
-            relevant = bc.set_relevant_polygons(shape)
-            if relevant:
-                relevant_bcs.append(bc)
-        bcs = relevant_bcs
-        logger.debug("#{pid} {time:.3f} relevant polygons set, {num_bcs} relevant basic shapes".format(time=(clock()-start), pid=pid, num_bcs=len(bcs)))
+        #bcs = self.geometry.components[self.geometry.top_level_entity].base_components
+        bcs = self.relevant_base_components
+        logger.debug("#{pid} {time:.3f} - relevant basic shapes: {num_bcs}".format(time=(clock()-start), pid=pid, num_bcs=len(bcs)))
         if self.strategy == 'sample':
             for sample in p.samples:
                 # calculate sample positions
                 sp = shapely.geometry.Point(sample[0] * p.width_step + bounds[0], sample[1] * p.height_step + bounds[1])
                 for bc in bcs:
+                    #logger.info('bc: %s point: %s', bc, sp)
+                    #logger.info('number of relevant polygons: %d', len(bc.relevant_polygons))
                     if bc.contains(sp):
                         try:
                             r[bc.material] += bc.material_budget
@@ -219,6 +218,9 @@ def main():
     parser.add_argument('--num-x-bins', type=argparse_power_of_two, required=True, help='Number of bins in the x direction (should be a power of 2)')
     parser.add_argument('--num-y-bins', type=argparse_power_of_two, required=True, help='Number of bins in the y direction (should be a power of 2)')
     parser.add_argument('--samples-per-bin', type=int, help='Number of bins in the y direction')
+    parser.add_argument('--top-level-entity', help='Defines the top level entity (overrides the one stated in the geometry file)')
+    parser.add_argument('--acceptance-radius', type=float, default=None, help='Acceptance radius [mm]. (Defaults to tan(25 deg) * --distance-to-target)')
+    parser.add_argument('--distance-to-target', type=float, default=None, help='Distance between the detector (station) and target [mm].')
     parser.add_argument('--strategy', choices=('sample', 'calculate'), help='Stategy to determine the materialbudget.')
     parser.add_argument('json_geometry_file', help='The geometry file in JSON format')
     parser.add_argument('output_name', help='The basename for the output files')
@@ -226,7 +228,7 @@ def main():
 
     # setting up logging and considering --debug
     ch = logging.StreamHandler()
-    fh = logging.FileHandler(args.output_name + '.log')
+    fh = logging.FileHandler(args.output_name + '.log', 'w+')
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     fh.setFormatter(formatter)
     ch.setFormatter(formatter)
@@ -280,6 +282,17 @@ def run(**kwargs):
     # g stands for 'geometry'
     g = munchify(g)
 
+    if kwargs.get('top_level_entity', None):
+        g.top_level_entity = kwargs.get('top_level_entity')
+
+    if kwargs.get('distance_to_target', None):
+        g.distance_to_target = kwargs.get('distance_to_target')
+
+    if kwargs.get('acceptance_radius', None):
+        g.acceptance_radius = kwargs.get('acceptance_radius')
+    else:
+        g.acceptance_radius = 0.46630766 * g.distance_to_target # 0.46630766 == tan( 25 deg )
+
     cs = g.components
 
     # Set .base_components for the components of kind == polygon
@@ -298,6 +311,7 @@ def run(**kwargs):
     svg_components = [c for c in cs if cs[c].kind == 'svg']
     for svg_component in svg_components:
         svg_file = cs[svg_component].filename
+        logger.debug("SVG file: %s", svg_file)
         try:
             polygons = get_polygons(svg_file)
             polygons = [polygon[1] for polygon in polygons]
@@ -319,8 +333,6 @@ def run(**kwargs):
     logger.info("Saving to SVG")
     dwg.saveas(kwargs.get('output_name') + '.svg')
     logger.info("Finished saving the SVG file!")
-
-
 
 
     # Preparing our Patches (= bins)
@@ -345,11 +357,62 @@ def run(**kwargs):
         p.components = dict()
         patches[id] = p
 
+    #def div_conq(x_idx, y_idx, x_pos, y_pos):
+    #    global TOTAL_STARTED_FUNCS
+    #    TOTAL_STARTED_FUNCS += 1
+    #    print(x_idx, y_idx, "starting; total started funcs:", TOTAL_STARTED_FUNCS)
+    #    def split_list(l):
+    #        "split list with even number of entries in two halfs"
+    #        half_len = len(l)//2
+    #        return l[:half_len], l[half_len:]
+    #    if len(x_idx) == 1 and len(y_idx) == 1:
+    #        # done dividing, let's conquer
+    #        print("x_pos", x_pos[x_idx[0]], "y_pos", y_pos[y_idx[0]])
+    #        TOTAL_STARTED_FUNCS -= 1
+    #        print(x_idx, y_idx, "ending; new amount of total started funcs:", TOTAL_STARTED_FUNCS)
+    #        return
+    #    if len(x_idx) >= len(y_idx):
+    #        x_idx_left, x_idx_right = split_list(x_idx)
+    #        div_conq(x_idx_left, y_idx, x_pos, y_pos)
+    #        div_conq(x_idx_right, y_idx, x_pos, y_pos)
+    #    else:
+    #        y_idx_left, y_idx_right = split_list(y_idx)
+    #        div_conq(x_idx, y_idx_left, x_pos, y_pos)
+    #        div_conq(x_idx, y_idx_right, x_pos, y_pos)
+    #    TOTAL_STARTED_FUNCS -= 1
+    #    print(x_idx, y_idx, "ending; new amount of total started funcs:", TOTAL_STARTED_FUNCS)
+
+
+    # Calculating the "jobs"
+    logger.info("Creating the CalculatePatchJob()s by calculating the relevant base components in divide and conquer style")
+    jobs = []
+    for id in patches:
+        bcs = g.components[g.top_level_entity].base_components
+        relevant_bcs = []
+        for bc in bcs:
+            relevant = bc.set_relevant_polygons(patches[id].shape)
+            if relevant:
+                bc = copy.copy(bc)
+                relevant_bcs.append(bc)
+                #logger.info('there are %d relevant polygons in bc %s', len(bc.relevant_polygons), bc)
+        #if relevant_bcs: logger.info('there are %d relevant bcs!', len(relevant_bcs))
+        bcs = relevant_bcs
+        jobs.append(CalculatePatchJob(patches[id], g, relevant_bcs, strategy=kwargs.get('strategy')))
+
     # Starting 'imaging'
     logger.info("Setting up the multiprocessing process pool")
     p = multiprocessing.Pool(multiprocessing.cpu_count())
     chunksize = 3 * multiprocessing.cpu_count()
-    jobs = [CalculatePatchJob(patches[id], g, strategy=kwargs.get('strategy')) for id in patches]
+    #import sys, statistics
+    #sizes = [sys.getsizeof(job) for job in jobs]
+    #stats = {
+    # "mean": statistics.mean(sizes),
+    # "min":  min(sizes),
+    # "max":  max(sizes),
+    # "median": statistics.median(sizes),
+    # }
+    #logger.debug("Job statistics/sizeof: mean: {mean} median: {median} min: {min} max: {max}".format(**info))
+    #sys.exit()
     #jobs = p.map(calc_job, jobs, chunksize=chunksize)
     ## instead use imap_unordered (to give more status output):
     results = []
