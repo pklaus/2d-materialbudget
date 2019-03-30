@@ -442,7 +442,8 @@ def run(**kwargs):
         for material in job.result:
             totals_layer[p.id_tuple] += job.result[material]
     np.save(open(kwargs.get('output_name') + '.npy', 'wb'), totals_layer)
-    plt.imshow(totals_layer, origin="lower", interpolation="nearest", extent=[start.x, end.x, start.y, end.y])
+    norm = matplotlib.colors.Normalize(vmin=0, vmax=0.67)
+    plt.imshow(totals_layer, origin="lower", norm=norm, interpolation="nearest", extent=[start.x, end.x, start.y, end.y])
     plt.gca().add_patch(plt.Circle((0, 0), radius=g.acceptance_radius, fill=None, edgecolor='r'))
     # create the colorbar with a better scale to the image:
     plt.colorbar(fraction=0.015, pad=0.04)

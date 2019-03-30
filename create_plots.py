@@ -119,6 +119,7 @@ def main():
     plt.fill(x, y, alpha=0.4, facecolor='w')
     #patch(Polygon([[0, 0], [4, 1.1], [6, 2.5], [2, 1.4]], closed=True, fill=False, hatch='/'))
 
+    plt.ylim(top=0.63, bottom=0.0)
 
     plt.savefig(args.output_name + '.theta.png')
     plt.savefig(args.output_name + '.theta.eps')
